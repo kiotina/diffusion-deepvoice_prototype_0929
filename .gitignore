@@ -4,3 +4,4 @@ checkpoints/
 artifacts/
 __pycache__/
 *.pyc
+dataset/

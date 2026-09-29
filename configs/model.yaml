@@ -14,7 +14,7 @@ checkpoint_dir: "checkpoints"
 val_ratio: 0.15         # 파일 단위 검증셋 비율 (화자 정보 생기면 화자 단위로 교체 예정)
 batch_size: 16
 lr: 0.0001
-epochs: 20               # 가벼운 확인용. 정식 학습은 아래 주석 참고해서 50~150으로.
+epochs: 50               # 가벼운 확인용. 정식 학습은 아래 주석 참고해서 50~150으로.
 
 model:
   base_channels: 64      # 가벼운 확인용. 정식은 64.

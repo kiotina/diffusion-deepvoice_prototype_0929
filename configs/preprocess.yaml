@@ -1,6 +1,6 @@
 dataset:
   # 전처리할 원본 Real WAV 폴더 (프로젝트 루트 기준 상대 경로)
-  input_dir: "data/for-2sec/for-2seconds/training/real"
+  input_dir: "dataset"
   # Mel과 mask가 저장될 위치 (프로젝트 내 processed 폴더 하위로 자동 저장)
   output_dir: "data/processed/real_mels"
   # 원본 개수가 이보다 적으면 실수로 작은 데이터셋을 학습하지 않도록 중단합니다. (보유 데이터 개수에 맞춰 수정 가능)

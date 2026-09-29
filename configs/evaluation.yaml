@@ -1,0 +1,12 @@
+# 평가에 사용할 Real/Fake 데이터와 모델 경로
+real_manifest: "data/processed/real_mels/manifest.csv"
+fake_dir: "D:/dataset/fake"
+checkpoint: "checkpoints/best_model.pt"
+preprocess_config: "configs/preprocess.yaml"
+
+# 점수 계산 설정
+eval_timesteps: [50, 150, 300, 450]
+aggregate: "mean"
+
+# 평가 결과 그래프 저장 위치
+plot_output: "artifacts/score_distribution.png"

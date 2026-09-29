@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from sklearn.metrics import roc_curve
+from tqdm import tqdm
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
@@ -57,10 +58,24 @@ def read_test_audio_paths(manifest_path: str | Path) -> list[Path]:
 
 
 def collect_scores(
-    audio_paths, model, diffusion, device, audio_config, mel_config, eval_timesteps, aggregate
+    audio_paths,
+    model,
+    diffusion,
+    device,
+    audio_config,
+    mel_config,
+    eval_timesteps,
+    aggregate,
+    desc,
 ) -> list[float]:
     scores = []
-    for audio_path in sorted(Path(path) for path in audio_paths):
+    sorted_paths = sorted(Path(path) for path in audio_paths)
+    for audio_path in tqdm(
+        sorted_paths,
+        desc=desc,
+        unit="file",
+        dynamic_ncols=True,
+    ):
         result = score_audio_file(
             str(audio_path), model, diffusion, device, audio_config, mel_config, eval_timesteps, aggregate
         )
@@ -174,10 +189,12 @@ def main():
     real_scores = collect_scores(
         real_paths, model, diffusion, device,
         preprocess_cfg.audio, preprocess_cfg.mel, args.eval_timesteps, args.aggregate,
+        desc="Real 평가",
     )
     fake_scores = collect_scores(
         fake_paths, model, diffusion, device,
         preprocess_cfg.audio, preprocess_cfg.mel, args.eval_timesteps, args.aggregate,
+        desc="Fake 평가",
     )
 
     print(f"real 개수: {len(real_scores)}, fake 개수: {len(fake_scores)}")

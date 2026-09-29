@@ -1,6 +1,6 @@
 # 평가에 사용할 Real/Fake 데이터와 모델 경로
 real_manifest: "data/processed/real_mels/manifest.csv"
-fake_dir: "D:/dataset/fake"
+fake_dir: "dataset/fake"
 checkpoint: "checkpoints/best_model.pt"
 preprocess_config: "configs/preprocess.yaml"
 

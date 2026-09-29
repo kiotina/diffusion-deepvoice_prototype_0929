@@ -5,7 +5,8 @@ ROC curve에서 EER(Equal Error Rate) 지점을 기준값으로 산출한다.
 
 사용 예:
     python scripts/find_threshold.py \
-        --real-dir data/val/real --fake-dir data/val/fake \
+        --real-manifest data/processed/real_mels/manifest.csv \
+        --fake-dir data/val/fake \
         --checkpoint checkpoints/best_model.pt --preprocess-config configs/preprocess.yaml \
         --eval-timesteps 20 60 100 150
 
@@ -13,6 +14,7 @@ sklearn과 matplotlib이 설치되어 있어야 한다 (pip install scikit-learn
 """
 
 import argparse
+import csv
 import sys
 from pathlib import Path
 
@@ -30,15 +32,41 @@ from scripts.score import load_model, score_audio_file  # noqa: E402
 from deepvoice_diffusion.config import load_config as load_preprocess_config  # noqa: E402
 
 
+def read_test_audio_paths(manifest_path: str | Path) -> list[Path]:
+    """manifest에서 화자 기준 test 분할의 원본 Real WAV 경로만 읽는다."""
+    manifest_path = Path(manifest_path)
+    with manifest_path.open("r", newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+
+    if not rows or "split" not in rows[0] or "source_path" not in rows[0]:
+        raise ValueError("manifest.csv에 split/source_path 컬럼이 없습니다.")
+
+    paths = [
+        Path(row["source_path"])
+        for row in rows
+        if row["split"] == "test"
+    ]
+    if not paths:
+        raise ValueError("manifest.csv에 test Real 데이터가 없습니다.")
+
+    missing_paths = [path for path in paths if not path.is_file()]
+    if missing_paths:
+        raise FileNotFoundError(f"test WAV 파일이 없습니다: {missing_paths[0]}")
+
+    return paths
+
+
 def collect_scores(
-    audio_dir: str, model, diffusion, device, audio_config, mel_config, eval_timesteps, aggregate
+    audio_paths, model, diffusion, device, audio_config, mel_config, eval_timesteps, aggregate
 ) -> list[float]:
     scores = []
-    for audio_path in sorted(Path(audio_dir).glob("*.wav")):
+    for audio_path in sorted(Path(path) for path in audio_paths):
         result = score_audio_file(
             str(audio_path), model, diffusion, device, audio_config, mel_config, eval_timesteps, aggregate
         )
         scores.append(result["file_score"])
+    if not scores:
+        raise ValueError("점수를 계산할 WAV 파일이 없습니다.")
     return scores
 
 
@@ -109,7 +137,17 @@ def plot_score_distributions(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--real-dir", type=str, required=True)
+    real_source = parser.add_mutually_exclusive_group(required=True)
+    real_source.add_argument(
+        "--real-manifest",
+        type=str,
+        help="전처리 manifest의 test 분할을 Real 평가 데이터로 사용",
+    )
+    real_source.add_argument(
+        "--real-dir",
+        type=str,
+        help="기존 방식대로 별도 Real 폴더를 평가",
+    )
     parser.add_argument("--fake-dir", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--preprocess-config", type=str, default="configs/preprocess.yaml")
@@ -127,12 +165,18 @@ def main():
     model, diffusion, _ = load_model(args.checkpoint, device)
     preprocess_cfg = load_preprocess_config(args.preprocess_config)
 
+    if args.real_manifest:
+        real_paths = read_test_audio_paths(args.real_manifest)
+    else:
+        real_paths = sorted(Path(args.real_dir).rglob("*.wav"))
+    fake_paths = sorted(Path(args.fake_dir).rglob("*.wav"))
+
     real_scores = collect_scores(
-        args.real_dir, model, diffusion, device,
+        real_paths, model, diffusion, device,
         preprocess_cfg.audio, preprocess_cfg.mel, args.eval_timesteps, args.aggregate,
     )
     fake_scores = collect_scores(
-        args.fake_dir, model, diffusion, device,
+        fake_paths, model, diffusion, device,
         preprocess_cfg.audio, preprocess_cfg.mel, args.eval_timesteps, args.aggregate,
     )
 

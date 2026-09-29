@@ -6,10 +6,9 @@
     <output_dir>/
         mels/00000_xxxxxxxxxx.npy    # (1, 80, 251) float32, [-1, 1]
         masks/00000_xxxxxxxxxx.npy   # (1, 1, 251) float32, 1=실제 프레임
-        manifest.csv                  # mel_path, mask_path 등 메타데이터
+        manifest.csv                  # mel_path, mask_path, speaker_id, split 등 메타데이터
 
-주의: manifest.csv에는 아직 화자(speaker) 정보가 없다. 그래서 지금은 파일 단위 랜덤 분리를 쓰고, 화자 컬럼이
-manifest에 추가되면 speaker_split() 부분만 그걸 쓰도록 바꾸면 된다.
+manifest의 split 컬럼에 따라 train/validation을 사용하고 test는 학습에서 제외한다.
 
 빠른 확인용:
     python scripts/train.py --max-batches 5
@@ -20,7 +19,6 @@ manifest에 추가되면 speaker_split() 부분만 그걸 쓰도록 바꾸면 �
 
 import argparse
 import csv
-import random
 from pathlib import Path
 
 import numpy as np
@@ -57,17 +55,45 @@ class RealMelDataset(Dataset):
         return torch.from_numpy(mel), torch.from_numpy(mask)
 
 
-def random_file_split(rows: list[dict], val_ratio: float = 0.15, seed: int = 42):
-    """
-    TODO(화자 정보 확보 후 교체): 지금은 manifest에 화자 id가 없어서
-    파일 단위로 랜덤 분리한다. 화자 컬럼이 추가되면 이 함수를 화자 단위
-    분리로 바꿔야 같은 화자가 train/val에 동시에 섞이는 문제를 막을 수 있다
-    
-    """
-    shuffled = rows[:]
-    random.Random(seed).shuffle(shuffled)
-    n_val = max(1, int(len(shuffled) * val_ratio))
-    return shuffled[n_val:], shuffled[:n_val]
+def split_manifest_rows(
+    rows: list[dict],
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """manifest에 기록된 화자 단위 분할을 그대로 사용한다."""
+    required_columns = {"speaker_id", "split", "mel_path", "mask_path"}
+    if not rows:
+        raise ValueError("manifest.csv에 데이터가 없습니다.")
+
+    missing_columns = required_columns - rows[0].keys()
+    if missing_columns:
+        raise ValueError(
+            "manifest.csv에 필요한 컬럼이 없습니다: "
+            + ", ".join(sorted(missing_columns))
+        )
+
+    train_rows = [row for row in rows if row["split"] == "train"]
+    val_rows = [row for row in rows if row["split"] == "validation"]
+    test_rows = [row for row in rows if row["split"] == "test"]
+
+    if not train_rows:
+        raise ValueError("manifest.csv에 train 데이터가 없습니다.")
+    if not val_rows:
+        raise ValueError("manifest.csv에 validation 데이터가 없습니다.")
+    if not test_rows:
+        raise ValueError("manifest.csv에 test 데이터가 없습니다.")
+
+    speaker_sets = {
+        "train": {row["speaker_id"] for row in train_rows},
+        "validation": {row["speaker_id"] for row in val_rows},
+        "test": {row["speaker_id"] for row in test_rows},
+    }
+    if speaker_sets["train"] & speaker_sets["validation"]:
+        raise ValueError("train과 validation에 같은 화자가 포함되어 있습니다.")
+    if speaker_sets["train"] & speaker_sets["test"]:
+        raise ValueError("train과 test에 같은 화자가 포함되어 있습니다.")
+    if speaker_sets["validation"] & speaker_sets["test"]:
+        raise ValueError("validation과 test에 같은 화자가 포함되어 있습니다.")
+
+    return train_rows, val_rows, test_rows
 
 
 def run_one_epoch(
@@ -127,8 +153,11 @@ def train(config_path: str, max_batches: int | None):
 
     manifest_path = Path(cfg["data_dir"]) / "manifest.csv"
     all_rows = read_manifest(manifest_path)
-    train_rows, val_rows = random_file_split(all_rows, val_ratio=cfg.get("val_ratio", 0.15))
-    print(f"train samples: {len(train_rows)}, val samples: {len(val_rows)}")
+    train_rows, val_rows, test_rows = split_manifest_rows(all_rows)
+    print(
+        f"train samples: {len(train_rows)}, "
+        f"val samples: {len(val_rows)}, test samples: {len(test_rows)}"
+    )
     if max_batches is not None:
         print(f"[빠른 테스트 모드] epoch당 최대 {max_batches}개 배치만 실행합니다.")
 

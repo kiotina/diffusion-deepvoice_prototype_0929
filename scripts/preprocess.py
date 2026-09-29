@@ -23,6 +23,7 @@ from deepvoice_diffusion.audio import (  # noqa: E402
 )
 from deepvoice_diffusion.config import load_config  # noqa: E402
 from deepvoice_diffusion.dataset import find_wav_files, select_files  # noqa: E402
+from deepvoice_diffusion.speaker_metadata import create_speaker_split  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,7 +66,16 @@ def main() -> None:
     args = parse_args()
     config = load_config(args.config)
 
-    # 2) WAV를 재귀적으로 찾고 최소 개수 조건을 먼저 확인한다.
+    # 2) WAV를 화자 기준으로 나눈 뒤 기존 최소/최대 개수 조건을 적용한다.
+    speaker_splits = create_speaker_split(config.dataset.input_dir)
+    sample_by_path = {
+        Path(sample["audio_path"]).resolve(): {
+            "speaker_id": str(sample["speaker_id"]),
+            "split": split_name,
+        }
+        for split_name, samples in speaker_splits.items()
+        for sample in samples
+    }
     files = select_files(
         find_wav_files(config.dataset.input_dir),
         config.dataset.min_samples,
@@ -94,6 +104,11 @@ def main() -> None:
 
     for index, source_path in enumerate(tqdm(files, desc="Creating log-Mels")):
         try:
+            source_path = source_path.resolve()
+            speaker_info = sample_by_path.get(source_path)
+            if speaker_info is None:
+                raise ValueError(f"화자 분할 정보를 찾을 수 없습니다: {source_path}")
+
             # 원본 길이와 sample rate는 manifest 기록용이다.
             source_info = sf.info(source_path)
 
@@ -126,6 +141,8 @@ def main() -> None:
                 {
                     "index": index,
                     "source_path": str(source_path),
+                    "speaker_id": speaker_info["speaker_id"],
+                    "split": speaker_info["split"],
                     "mel_path": str(destination),
                     "mask_path": str(mask_destination),
                     "source_duration_seconds": round(float(source_info.duration), 6),
@@ -163,6 +180,7 @@ def main() -> None:
         "requested_files": len(files),
         "processed_files": len(rows),
         "failed_files": failures,
+        "split_counts": dict(Counter(str(row["split"]) for row in rows)),
         "shapes": dict(shapes),
         "mask_shapes": dict(mask_shapes),
         "crop_mode": config.audio.crop_mode,

@@ -4,7 +4,7 @@
 # 처음 다시 시작할 때는 이 값 그대로 한 번 돌려서 파이프라인이 정상 작동하는지
 # 먼저 확인하고, 문제없으면 맨 아래 "정식 규모로 키울 때" 안내를 참고해서 키우면 된다.
 
-device: "cpu"          # GPU 있으면 "cuda"
+device: "cuda"          # GPU 있으면 "cuda"
 
 # configs/preprocess.yaml의 dataset.output_dir과 동일한 경로여야 한다.
 # 이 폴더 밑에 mels/, masks/, manifest.csv가 있어야 한다.
@@ -14,21 +14,21 @@ checkpoint_dir: "checkpoints"
 val_ratio: 0.15         # 파일 단위 검증셋 비율 (화자 정보 생기면 화자 단위로 교체 예정)
 batch_size: 16
 lr: 0.0001
-epochs: 5               # 가벼운 확인용. 정식 학습은 아래 주석 참고해서 50~150으로.
+epochs: 20               # 가벼운 확인용. 정식 학습은 아래 주석 참고해서 50~150으로.
 
 model:
-  base_channels: 16      # 가벼운 확인용. 정식은 64.
-  time_base_dim: 32       # 가벼운 확인용. 정식은 128.
-  time_dim: 64            # 가벼운 확인용. 정식은 512.
+  base_channels: 64      # 가벼운 확인용. 정식은 64.
+  time_base_dim: 128       # 가벼운 확인용. 정식은 128.
+  time_dim: 512            # 가벼운 확인용. 정식은 512.
 
 diffusion:
-  timesteps: 180          # 가벼운 확인용. 정식은 500.
+  timesteps: 500          # 가벼운 확인용. 정식은 500.
   beta_start: 0.0001
   beta_end: 0.02
 
 # score.py / find_threshold.py 실행 시 --eval-timesteps로 넘길 기본값.
 # 반드시 위 diffusion.timesteps보다 작은 숫자들이어야 한다 (안 그러면 index 에러).
-eval_timesteps: [20, 60, 100, 150]
+eval_timesteps: [50, 150, 300, 450]
 aggregate: "mean"    # "mean" 또는 "max"
 
 # ---------------------------------------------------------------------------

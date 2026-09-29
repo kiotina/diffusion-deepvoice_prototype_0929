@@ -1,0 +1,39 @@
+dataset:
+  # 전처리할 원본 Real WAV 폴더 (프로젝트 루트 기준 상대 경로)
+  input_dir: "data/for-2sec/for-2seconds/training/real"
+  # Mel과 mask가 저장될 위치 (프로젝트 내 processed 폴더 하위로 자동 저장)
+  output_dir: "data/processed/real_mels"
+  # 원본 개수가 이보다 적으면 실수로 작은 데이터셋을 학습하지 않도록 중단합니다. (보유 데이터 개수에 맞춰 수정 가능)
+  min_samples: 100
+  # null이면 발견한 파일을 전부 사용한다.
+  max_samples: null
+
+audio:
+  # 모든 입력을 16 kHz로 통일한다.
+  sample_rate: 16000
+  # diffusion 모델이 한 번에 볼 고정 길이 (2초 설정 반영)
+  duration_seconds: 2.0
+  # 2초보다 긴 학습 음성에서 임의의 2초 구간을 선택한다.
+  crop_mode: random
+  # 파일별 random crop을 다시 실행해도 동일하게 재현하기 위한 기준값
+  random_seed: 42
+  # 추론 시 창 겹침 간격
+  inference_overlap_seconds: 0.0
+  # 녹음 환경과 원래의 무음 구간을 보존하기 위해 현재는 끈 상태이다.
+  trim_silence: false
+  # trim_silence가 true일 때만 사용하는 무음 판단 기준
+  trim_top_db: 35.0
+
+mel:
+  # 약 64 ms(1024 / 16000)의 음성을 한 번에 주파수 분석한다.
+  n_fft: 1024
+  # 분석 창을 약 16 ms(256 / 16000)씩 이동한다.
+  hop_length: 256
+  win_length: 1024
+  # 선형 주파수 축을 80개의 Mel 주파수 구간으로 압축한다.
+  n_mels: 80
+  # 16 kHz 음성에서 사용할 주파수 범위
+  f_min: 20.0
+  f_max: 8000.0
+  # 각 음성의 최대 에너지보다 80 dB 이상 작은 값은 -80 dB로 제한한다.
+  top_db: 80.0
